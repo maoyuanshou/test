@@ -1,0 +1,3 @@
+from .Mydataset_HMC_MultiTask import Mydataset_HMC_MultiTask
+from .Mydataset_CAMUS_MultiTask import Mydataset_CAMUS_Multitask
+from .Mydataset_Sichuan_ViewCls import Mydataset_Sichuan_ViewCls
