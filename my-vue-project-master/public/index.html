@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="<%= BASE_URL %>favicon.ico">
+  <title>
+    map
+  </title>
+  <!-- <%= htmlWebpackPlugin.options.title %> -->
+  <link href="/lib/ol/ol.css" rel="stylesheet" />
+  <link href="/lib/ol/ol-ext.css" rel="stylesheet" />
+  <link href="/css/mars_style.css" rel="stylesheet" />
+  <script src="/lib/pace.min.js"></script>
+  <script src="/lib/turf/turf.js"></script>
+  <script src="/lib/ol/ol.js"></script>
+  <script src="/lib/ol/ol-ext.js"></script>
+  <script src="/lib/jquery-3.4.1.min.js"></script>
+
+  <!-- mars3d -->
+  <!--引入cesium基础lib-->
+  <link href="http://mars3d.cn/lib/Cesium/Widgets/widgets.css" rel="stylesheet" type="text/css" />
+  <script src="http://mars3d.cn/lib/Cesium/Cesium.js" type="text/javascript" ></script>
+  <script src="http://mars3d.cn/lib/turf/turf.min.js" type="text/javascript" ></script>
+  <!--引入mars3d库lib-->
+  <link href="http://mars3d.cn/lib/mars3d/mars3d.css" rel="stylesheet" type="text/css" />
+  <script src="http://mars3d.cn/lib/mars3d/mars3d.js" type="text/javascript" ></script>  
+  <!--引入mars3d库插件lib（按需引入）-->  
+  <script src="http://mars3d.cn/lib/mars3d/plugins/space/mars3d-space.js" type="text/javascript" ></script>  
+  <!--第三方lib，非必须-->
+  <link rel="stylesheet" href="http://mars3d.cn/lib/fonts/font-awesome/css/font-awesome.min.css">
+  <script type="text/javascript" src="http://mars3d.cn/lib/hao/haoutil.js"></script>
+  <!-- mars3d end. -->
+</head>
+
+<body>
+  <noscript>
+    <strong>We're sorry but <%= htmlWebpackPlugin.options.title %> doesn't work properly without JavaScript enabled.
+        Please enable it to continue.</strong>
+  </noscript>
+  <div id="app"></div>
+  <script>
+     window.SITE_CONFIG = {};
+  </script>
+</body>
+
+</html>
