@@ -1,19 +1,19 @@
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
-import torchmetrics # 计算模型性能的各种指标
-import madgrad # 优化器
+import torchmetrics
+import madgrad
 from models import CVFMultiTask, ViewClsModel
+import time
+import matplotlib.pyplot as plt
+from datetime import datetime
 
-# 模型结构和流程，两个函数分别对应多任务和视图分类任务
-
-# 视图分类任务模型
 class MyModel_View_CLS_Video(pl.LightningModule):  #根据需要替换model部分
     def __init__(self, mlr=1e-6):
         super().__init__()
-        self.model = ViewClsModel() # 使用视图分类模型
-        self.learning_rate = mlr # 设置学习率
-        self.BCEcriterion = nn.BCEWithLogitsLoss() # 使用二分类损失函数
+        self.model = ViewClsModel()
+        self.learning_rate = mlr
+        self.BCEcriterion = nn.BCEWithLogitsLoss()
 
         # 初始化 torchmetrics 的指标
         self.spec = torchmetrics.Specificity(task='multiclass', num_classes=8, average='macro')
@@ -22,28 +22,59 @@ class MyModel_View_CLS_Video(pl.LightningModule):  #根据需要替换model部�
         self.rec = torchmetrics.Recall(task='multiclass', num_classes=8, average='macro')
         self.acc = torchmetrics.Accuracy(task='multiclass', num_classes=8)
 
-    # 前向传播
+        # 绘图数据存储
+        self.train_losses = []
+        self.train_accs = []
+        self.val_losses = []
+        self.val_accs = []
+        # 存训练和测试时间
+        self.train_epoch_start_time = 0
+        self.validation_epoch_start_time = 0
+
+
     def forward(self, x):
         logits = self.model(x)
         return logits
 
-    # 训练过程：包含了模型整个流程
+    # epoch开始前存一个时间
+    def on_train_epoch_start(self):
+        self.train_epoch_start_time = time.time()
+    
+    # epoch结束后再记录一下时间，减最初的时间就是这一个epoch的时间
+    def on_train_epoch_end(self):
+        epoch_time = time.time() - self.train_epoch_start_time
+        print(f"Epoch {self.current_epoch} Training Time: {epoch_time:.2f}s")
+                # # 存一下这一个epoch的loss和acc，方便最后画图
+        train_loss = self.trainer.callback_metrics.get("train_loss")
+        train_acc = self.trainer.callback_metrics.get("train_acc")
+        if train_loss: 
+            self.train_losses.append(train_loss.item())
+        if train_acc: 
+            self.train_accs.append(train_acc.item())
+
     def training_step(self, batch, batch_idx):
-        images, labels = batch # 从batch中取出图像和标签
-        labels = labels.long()  # Ensure labels are Long type，符合CrossEntropyLoss要求
-        outputs = self(images) #获取模型的输出
-        loss = nn.CrossEntropyLoss()(outputs, labels) #计算交叉熵损失
-        preds = torch.argmax(outputs, dim=1) #获取预测类别
+        images, labels = batch
+        labels = labels.long()  # Ensure labels are Long type
+        outputs = self(images)
+        loss = nn.CrossEntropyLoss()(outputs, labels)
+        preds = torch.argmax(outputs, dim=1)
 
         # Calculate and log training metrics
 
-        acc = self.acc(preds, labels) # 计算准确率
-        self.log("train_loss", loss) # 记录训练损失
+        acc = self.acc(preds, labels)
+        self.log("train_loss", loss)
         self.log("train_acc", acc, on_step=False,
-                 on_epoch=True, prog_bar=True, logger=True) # 记录准确率
-        return loss # 返回损失供优化器更新
-    # 验证过程
+                 on_epoch=True, prog_bar=True, logger=True)
+        return loss
+    # 测试epoch前记录一个时间
+    def validation_epoch_start(self):
+        self.validation_epoch_start_time = time.time()
+
+    # epoch中的每一步
     def validation_step(self, batch, batch_idx):
+        #这里是因为有时候抓不住测试epoch的start，所以在这判断一下，如果validation_epoch_start_time为0就说明是这个epoch的第一步，记录个时间
+        if self.validation_epoch_start_time == 0:
+             self.validation_epoch_start_time = time.time()
         images, labels = batch
         labels = labels.long()  # Ensure labels are Long type
         outputs = self(images)
@@ -66,43 +97,123 @@ class MyModel_View_CLS_Video(pl.LightningModule):  #根据需要替换model部�
 
         return {'val_loss': loss}
 
-    # 汇总验证指标
     def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean() # 将每个batch的val_loss值堆叠并计算平均值
-        self.log('val_loss_epoch', avg_loss) # 记录每个epoch的验证损失
+        # 只要有开始时间就可以计算结束时间
+        if self.validation_epoch_start_time != 0:
+            epoch_time = time.time() - self.validation_epoch_start_time
+            print(f"Epoch {self.current_epoch} Validation Time: {epoch_time:.2f}s")
+            self.validation_epoch_start_time = 0
+           
+        
+        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+        self.log('val_loss_epoch', avg_loss)
+        # 记录数据，方便后面画图
+        self.val_losses.append(avg_loss.item())
+        val_acc = self.trainer.callback_metrics.get("val_acc")
+        if val_acc: 
+            self.val_accs.append(val_acc.item())
 
-    # 配置madgrad优化器
     def configure_optimizers(self):
-        # 选择所有需要更新的参数；设置学习率
         optimizer = madgrad.MADGRAD(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
         return optimizer
 
-# 多任务模型
+    #绘图函数
+    def plot_metrics(self, dpi=300):
+        plt.figure(figsize=(12,5))
+      
+        # Loss曲线
+        plt.subplot(121)
+        plt.plot(self.train_losses, label='Train')
+        plt.plot(self.val_losses, label='Val')
+        plt.title('Loss Curve')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+      
+        # Accuracy曲线
+        plt.subplot(122)
+        plt.plot(self.train_accs, label='Train')
+        plt.plot(self.val_accs, label='Val')
+        plt.title('Accuracy Curve')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+      
+        # 保存和清理
+        plt.tight_layout()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = f"metrics_{timestamp}.png"
+        plt.savefig(save_path, dpi=dpi, bbox_inches='tight')  # 保存为高分辨率图片
+        plt.close()  # 防止内存泄漏
+        
+        print(f"Metrics plot saved to {save_path}")
+        
+
+
 class MyModel_MultiTask(pl.LightningModule):
     def __init__(self, mlr=1e-5, free_epoch=80):
         super().__init__()
-        self.model = CVFMultiTask(frozen=True) # 初始化多任务模型
-        self.learning_rate = mlr # 设置学习率
-        self.BCEcriterion = nn.BCEWithLogitsLoss() #设置二分类损失函数
-        self.free_epoch = free_epoch #设置解冻操作的epoch
+        self.model = CVFMultiTask(frozen=True)
+        self.learning_rate = mlr
+        self.BCEcriterion = nn.BCEWithLogitsLoss()
+        self.free_epoch = free_epoch
 
-        self.best_acc_view = 0.0 #初始化视图分类任务的最佳准确率
-        self.best_acc_mi = 0.0 #初始化MI诊断任务的最佳准确率
-        self.best_acc_metrics_view = {} #储存视图分类的指标
-        self.best_acc_metrics_mi = {} #储存心肌梗死诊断的指标
+        self.best_acc_view = 0.0
+        self.best_acc_mi = 0.0
+        self.best_acc_metrics_view = {}
+        self.best_acc_metrics_mi = {}
 
-    # 每个 epoch 开始时的操作
+    # 绘图数据存储，因为分不同任务，所以分开记录
+        self.train_losses = []
+        self.train_losses_view = []
+        self.train_losses_mi = []
+        self.train_accs_view = []
+        self.train_accs_mi = []
+        self.val_losses_view = []
+        self.val_losses_mi = []
+        self.val_accs_view = []
+        self.val_accs_mi= []
+        # 存训练和测试时间
+        self.train_epoch_start_time = 0
+        self.validation_epoch_start_time = 0
+
     def on_epoch_start(self):
         if self.current_epoch == self.free_epoch:
-            # 第 80 个 epoch 开始时解冻心梗诊断相关模块
+            # 第 50 个 epoch 开始时解冻心梗诊断相关模块
             self.model.unfreeze_mi_task()
             print("解冻心梗诊断模块的参数")
-    # 前向传播
+
     def forward(self, x1, x2):
         # 返回三个logit值，分别是MI任务的logit和两个视图的logit
         logit_mi, logit_view1, logit_view2 = self.model(x1, x2)
         return logit_mi, logit_view1, logit_view2
-    # 训练过程：包含了模型整个流程
+
+    # epoch开始前存一个时间
+    def on_train_epoch_start(self):
+        self.train_epoch_start_time = time.time()
+    
+    # epoch结束后再记录一下时间，减最初的时间就是这一个epoch的时间
+    def on_train_epoch_end(self):
+        epoch_time = time.time() - self.train_epoch_start_time
+        print(f"Epoch {self.current_epoch} Training Time: {epoch_time:.2f}s")
+                # # 存一下这一个epoch的loss和acc，方便最后画图
+        train_loss = self.trainer.callback_metrics.get("train_loss")
+        train_loss_view = self.trainer.callback_metrics.get("train_loss_view")
+        train_loss_mi =self.trainer.callback_metrics.get("train_loss_mi")
+        train_acc_view = self.trainer.callback_metrics.get("train_acc_view")
+        train_acc_mi = self.trainer.callback_metrics.get("train_acc_mi")
+        
+        if train_loss: 
+            self.train_losses.append(train_loss.item())
+        if train_loss_view: 
+            self.train_losses_view.append(train_loss_view.item())
+        if train_loss_mi: 
+            self.train_losses_mi.append(train_loss_mi.item())
+        if train_acc_view: 
+            self.train_accs_view.append(train_acc_view.item())
+        if train_acc_mi: 
+            self.train_accs_mi.append(train_acc_mi.item())
+
     def training_step(self, batch, batch_idx):
         # for name, param in self.model.named_parameters():
         #     if param.grad is not None:
@@ -159,8 +270,15 @@ class MyModel_MultiTask(pl.LightningModule):
 
         return loss
 
-    # 验证过程
+    # 测试epoch前记录一个时间
+    def validation_epoch_start(self):
+        self.validation_epoch_start_time = time.time()
+        
     def validation_step(self, batch, batch_idx):
+        #这里是因为有时候抓不住测试epoch的start，所以在这判断一下，如果validation_epoch_start_time为0就说明是这个epoch的第一步，记录个时间
+        if self.validation_epoch_start_time == 0:
+             self.validation_epoch_start_time = time.time()
+            
         (x1, x2), labels = batch
         view_labels = labels["View_label"]
         mi_labels = labels["MI_label"]
@@ -188,7 +306,7 @@ class MyModel_MultiTask(pl.LightningModule):
             "true_mi": mi_labels,
             "loss_mi": loss_mi,
         }
-    # 汇总验证指标
+
     def validation_epoch_end(self, validation_step_outputs):
         preds_view1 = []
         true_view1 = []
@@ -291,9 +409,64 @@ class MyModel_MultiTask(pl.LightningModule):
                     "val_f1_mi": f1_mi,
                     "val_auc_mi": auc_mi
                 }
+
+        # 只要有开始时间就可以计算结束时间
+        if self.validation_epoch_start_time != 0:
+            epoch_time = time.time() - self.validation_epoch_start_time
+            print(f"Epoch {self.current_epoch} Validation Time: {epoch_time:.2f}s")
+            self.validation_epoch_start_time = 0
+           
+        # 记录数据，方便后面画图
+        self.val_losses_view.append(val_loss_view.item())
+        # 这里是为了让数据一样长，因为free_epoch之前没有MI任务，只有View任务
+        if self.current_epoch >= self.free_epoch:
+            self.val_losses_mi.append(val_loss_mi.item())
+        else:
+            self.val_losses_mi.append(0.0)  # 保持长度一致
+      
+        self.val_accs_view.append(acc_view.item())
+        if self.current_epoch >= self.free_epoch:
+            self.val_accs_mi.append(acc_mi.item())
+            
     def configure_optimizers(self):
         optimizer = madgrad.MADGRAD(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
         return optimizer
 
+    #绘图函数
+    def plot_metrics(self, dpi=300):
+        plt.figure(figsize=(12,5))
+      
+        # Loss曲线
+        # train的view、mi+验证的view、mi
+        plt.subplot(121)
+        plt.plot(self.train_losses_view, label='T_View')
+        plt.plot(self.train_losses_mi, label='T_MI')
+        plt.plot(self.val_losses_view, label='V_View')
+        plt.plot(self.val_losses_mi, label='V_MI')
+        plt.title('Loss Curve')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+      
+        # Accuracy曲线
+        # 和loss一样，分开列
+        plt.subplot(122)
+        plt.plot(self.train_accs_view, label='T_View')
+        plt.plot(self.train_accs_mi, label='T_MI')
+        plt.plot(self.val_accs_view, label='V_View')
+        plt.plot(self.val_accs_mi, label='V_MI')
+        plt.title('Accuracy Curve')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+      
+        # 保存和清理
+        plt.tight_layout()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = f"metrics_{timestamp}.png"
+        plt.savefig(save_path, dpi=dpi, bbox_inches='tight')  # 保存为高分辨率图片
+        plt.close()  # 防止内存泄漏
+        
+        print(f"Metrics plot saved to {save_path}")
 
 
