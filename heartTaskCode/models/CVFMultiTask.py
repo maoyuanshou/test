@@ -4,6 +4,10 @@ from modules import VideoEncoderForMulti, TextEncoder, MutiTask_MIClsMLP,MutiTas
 import utils
 from open_clip import tokenize
 
+
+# 多任务模型的流程
+
+# 多任务模型
 class CVFMultiTask(pl.LightningModule):
     def __init__(self, frozen=True):
         super().__init__()
@@ -26,7 +30,8 @@ class CVFMultiTask(pl.LightningModule):
 
         # 冻结状态标志
         self.freeze_mi_task()
-
+    
+    #冻结MI任务
     def freeze_mi_task(self):
         # 冻结心梗诊断相关的参数 并且解冻编码器
         for param in self.miMLP.parameters():
@@ -34,6 +39,7 @@ class CVFMultiTask(pl.LightningModule):
         for param in self.crossViewAttnfusion.parameters():
             param.requires_grad = False
 
+    #解冻MI任务
     def unfreeze_mi_task(self):
         # 解冻心梗诊断相关的参数 冻结编码器 解冻倒数嵌入层
         for param in self.miMLP.parameters():
@@ -41,7 +47,7 @@ class CVFMultiTask(pl.LightningModule):
         for param in self.crossViewAttnfusion.parameters():
             param.requires_grad = True
 
-
+    # 训练流程
     def forward(self, video1, video2):
 
         # 获取视频特征

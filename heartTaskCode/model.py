@@ -1,18 +1,19 @@
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
-import torchmetrics
-import madgrad
+import torchmetrics # 计算模型性能的各种指标
+import madgrad # 优化器
 from models import CVFMultiTask, ViewClsModel
 
+# 模型结构和流程，两个函数分别对应多任务和视图分类任务
 
-
+# 视图分类任务模型
 class MyModel_View_CLS_Video(pl.LightningModule):  #根据需要替换model部分
     def __init__(self, mlr=1e-6):
         super().__init__()
-        self.model = ViewClsModel()
-        self.learning_rate = mlr
-        self.BCEcriterion = nn.BCEWithLogitsLoss()
+        self.model = ViewClsModel() # 使用视图分类模型
+        self.learning_rate = mlr # 设置学习率
+        self.BCEcriterion = nn.BCEWithLogitsLoss() # 使用二分类损失函数
 
         # 初始化 torchmetrics 的指标
         self.spec = torchmetrics.Specificity(task='multiclass', num_classes=8, average='macro')
@@ -21,25 +22,27 @@ class MyModel_View_CLS_Video(pl.LightningModule):  #根据需要替换model部�
         self.rec = torchmetrics.Recall(task='multiclass', num_classes=8, average='macro')
         self.acc = torchmetrics.Accuracy(task='multiclass', num_classes=8)
 
+    # 前向传播
     def forward(self, x):
         logits = self.model(x)
         return logits
 
+    # 训练过程：包含了模型整个流程
     def training_step(self, batch, batch_idx):
-        images, labels = batch
-        labels = labels.long()  # Ensure labels are Long type
-        outputs = self(images)
-        loss = nn.CrossEntropyLoss()(outputs, labels)
-        preds = torch.argmax(outputs, dim=1)
+        images, labels = batch # 从batch中取出图像和标签
+        labels = labels.long()  # Ensure labels are Long type，符合CrossEntropyLoss要求
+        outputs = self(images) #获取模型的输出
+        loss = nn.CrossEntropyLoss()(outputs, labels) #计算交叉熵损失
+        preds = torch.argmax(outputs, dim=1) #获取预测类别
 
         # Calculate and log training metrics
 
-        acc = self.acc(preds, labels)
-        self.log("train_loss", loss)
+        acc = self.acc(preds, labels) # 计算准确率
+        self.log("train_loss", loss) # 记录训练损失
         self.log("train_acc", acc, on_step=False,
-                 on_epoch=True, prog_bar=True, logger=True)
-        return loss
-
+                 on_epoch=True, prog_bar=True, logger=True) # 记录准确率
+        return loss # 返回损失供优化器更新
+    # 验证过程
     def validation_step(self, batch, batch_idx):
         images, labels = batch
         labels = labels.long()  # Ensure labels are Long type
@@ -63,39 +66,43 @@ class MyModel_View_CLS_Video(pl.LightningModule):  #根据需要替换model部�
 
         return {'val_loss': loss}
 
+    # 汇总验证指标
     def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        self.log('val_loss_epoch', avg_loss)
+        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean() # 将每个batch的val_loss值堆叠并计算平均值
+        self.log('val_loss_epoch', avg_loss) # 记录每个epoch的验证损失
 
+    # 配置madgrad优化器
     def configure_optimizers(self):
+        # 选择所有需要更新的参数；设置学习率
         optimizer = madgrad.MADGRAD(filter(lambda p: p.requires_grad, self.parameters()), lr=self.learning_rate)
         return optimizer
 
-
+# 多任务模型
 class MyModel_MultiTask(pl.LightningModule):
     def __init__(self, mlr=1e-5, free_epoch=80):
         super().__init__()
-        self.model = CVFMultiTask(frozen=True)
-        self.learning_rate = mlr
-        self.BCEcriterion = nn.BCEWithLogitsLoss()
-        self.free_epoch = free_epoch
+        self.model = CVFMultiTask(frozen=True) # 初始化多任务模型
+        self.learning_rate = mlr # 设置学习率
+        self.BCEcriterion = nn.BCEWithLogitsLoss() #设置二分类损失函数
+        self.free_epoch = free_epoch #设置解冻操作的epoch
 
-        self.best_acc_view = 0.0
-        self.best_acc_mi = 0.0
-        self.best_acc_metrics_view = {}
-        self.best_acc_metrics_mi = {}
+        self.best_acc_view = 0.0 #初始化视图分类任务的最佳准确率
+        self.best_acc_mi = 0.0 #初始化MI诊断任务的最佳准确率
+        self.best_acc_metrics_view = {} #储存视图分类的指标
+        self.best_acc_metrics_mi = {} #储存心肌梗死诊断的指标
 
+    # 每个 epoch 开始时的操作
     def on_epoch_start(self):
         if self.current_epoch == self.free_epoch:
-            # 第 50 个 epoch 开始时解冻心梗诊断相关模块
+            # 第 80 个 epoch 开始时解冻心梗诊断相关模块
             self.model.unfreeze_mi_task()
             print("解冻心梗诊断模块的参数")
-
+    # 前向传播
     def forward(self, x1, x2):
         # 返回三个logit值，分别是MI任务的logit和两个视图的logit
         logit_mi, logit_view1, logit_view2 = self.model(x1, x2)
         return logit_mi, logit_view1, logit_view2
-
+    # 训练过程：包含了模型整个流程
     def training_step(self, batch, batch_idx):
         # for name, param in self.model.named_parameters():
         #     if param.grad is not None:
@@ -151,6 +158,8 @@ class MyModel_MultiTask(pl.LightningModule):
           self.log("train_acc_mi", acc_mi, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
         return loss
+
+    # 验证过程
     def validation_step(self, batch, batch_idx):
         (x1, x2), labels = batch
         view_labels = labels["View_label"]
@@ -179,7 +188,7 @@ class MyModel_MultiTask(pl.LightningModule):
             "true_mi": mi_labels,
             "loss_mi": loss_mi,
         }
-
+    # 汇总验证指标
     def validation_epoch_end(self, validation_step_outputs):
         preds_view1 = []
         true_view1 = []

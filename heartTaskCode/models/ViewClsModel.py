@@ -2,7 +2,7 @@ import torch
 import pytorch_lightning as pl
 from modules import VideoEncoder, ClsMLP
 
-
+# 视图分类模型的流程
 
 class ViewClsModel(pl.LightningModule):
     def __init__(self, clsNum = 8):

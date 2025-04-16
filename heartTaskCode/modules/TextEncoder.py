@@ -3,8 +3,10 @@ import torch
 import torchvision
 from open_clip import tokenize, create_model_and_transforms
 
+# 文本编码器，应该也是之前代码剩的，用不到
 
 class TextEncoder(pl.LightningModule):
+    #调用echo-clip模型
     def __init__(self):
         super().__init__()
         echo_clip, _, _ = create_model_and_transforms(

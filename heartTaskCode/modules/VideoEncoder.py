@@ -4,7 +4,10 @@ import pytorch_lightning as pl
 import torch
 import torchvision
 
+#视频编码器
 
+
+# 模型输入维度不匹配时，自动添加维度
 def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> Tuple[torch.Tensor, int]:
     tensor_dim = x.dim()
     if tensor_dim == target_dim - 1:
@@ -16,8 +19,9 @@ def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> Tuple[torch
 
 torch.fx.wrap("_unsqueeze")
 
-
+# 视频编码器类：用于视图分类模型
 class VideoEncoder(pl.LightningModule):
+    #初始化函数，加载预训练模型
     def __init__(self, frozen=False):
         super(VideoEncoder, self).__init__()
         checkpoint = torch.load("./model_weight/echo_prime_encoder.pt", weights_only=True)
@@ -32,8 +36,9 @@ class VideoEncoder(pl.LightningModule):
         Videosfeatures = self.echo_encoder(x)
         return Videosfeatures
 
-
+#多任务视频编码器：用于多任务模型
 class VideoEncoderForMulti(pl.LightningModule):
+    #初始化函数，加载预训练模型
     def __init__(self, frozen=True):
         super(VideoEncoderForMulti, self).__init__()
         # 加载预训练模型

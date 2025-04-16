@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+# 多任务适配器
+
 class ViewAdapter(nn.Module):
     def __init__(self, input_dim, adapter_dim):
         super(ViewAdapter, self).__init__()
@@ -19,6 +21,7 @@ class ViewAdapter(nn.Module):
         x = self.up_project(x)
         return x + residual  # 这里是残差连接
 
+# 这里是文本任务适配器，但是应该用不到，之前代码剩的
 class TextAdapter(nn.Module):
     def __init__(self, input_dim, adapter_dim):
         super(TextAdapter, self).__init__()

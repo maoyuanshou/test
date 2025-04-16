@@ -4,8 +4,10 @@ from datasets import Mydataset_Sichuan_ViewCls
 from model import MyModel_View_CLS_Video
 import torch
 
+# 视图分类任务代码，用于省医院数据集
 
 if __name__ == '__main__':
+    # 加载数据集
     train_dataset = Mydataset_Sichuan_ViewCls(r"D:\dataset\shengyiyuan\切面分类\train.txt")
     test_dataset = Mydataset_Sichuan_ViewCls(r"D:\dataset\shengyiyuan\切面分类\test.txt")
 
@@ -24,7 +26,7 @@ if __name__ == '__main__':
     precs = []
     recs = []
 
-    # 使用 checkpoint 继续训练
+    # 使用 checkpoint 继续训练（类似断点续传）
     checkpoint_callback = ModelCheckpoint(
         dirpath="./checkpoint",  # 保存路径
         filename="viewCls-checkpoint",  # 文件名格式
@@ -33,7 +35,7 @@ if __name__ == '__main__':
         monitor="val_loss",  # 监控的指标
         mode="min"  # "min" 表示最小化该指标
     )
-
+    # 初始化 Trainer、模型并进行训练
     trainer = Trainer(max_epochs=1000, gpus=[0], callbacks=[checkpoint_callback], check_val_every_n_epoch=1)
     model = MyModel_View_CLS_Video(1e-5)
     trainer.fit(model, train_dataloader, test_dataloader)

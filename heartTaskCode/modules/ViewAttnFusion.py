@@ -3,9 +3,15 @@ from torch import nn
 from collections import OrderedDict
 from timm.models.layers import trunc_normal_
 import pytorch_lightning as pl
+
+# 多任务模型 中 融合视图的注意力模块
+
+# Quick GELU
 class QuickGELU(pl.LightningModule):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
+
+# 残差注意力块
 class ResidualAttentionBlock(pl.LightningModule):
     def __init__(self, d_model: int, n_head: int):
         super().__init__()
@@ -27,6 +33,7 @@ class ResidualAttentionBlock(pl.LightningModule):
         x = x + self.mlp(self.ln_2(x))
         return x
 
+# 注意力融合模块
 class AttnFusion(pl.LightningModule):#加入cls_token
     def __init__(self, viewCount=2, embed_dim=512, layers=1):
         super().__init__()

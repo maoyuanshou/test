@@ -3,6 +3,7 @@ import random
 import torchvision
 from . import video_utils
 
+# 加载HMC数据集
 
 class Mydataset_HMC_MultiTask(torchvision.datasets.VisionDataset):
     def __init__(self, split, fold):

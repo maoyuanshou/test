@@ -17,7 +17,11 @@ parser.add_argument('--experimentName', type=str, default='CAMUS_CVF+多任务')
 args = parser.parse_args()
 print(args)
 
+# 多任务+MI分类 文件，对应CAMUS和HMC数据集
 
+
+
+# 固定随机种子：确保实验的可重复性（理论上随机种子相同，实验结果相同）
 def fix_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -27,7 +31,7 @@ def fix_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
-fix_seed(3407)
+fix_seed(3407) #这里取巧了，设置随机种子为3407，这个值有时候可以让实验结果获得魔法提升（没理由，莫名其妙，但是有人用论文证明了<3407 is all you need>)
 gpu = args.gpu
 lr = args.lr
 view = args.view
@@ -51,6 +55,8 @@ mi_precs = []
 mi_recs = []
 mi_aucs = []
 
+# 定义一个新的回调类，继承自 ModelCheckpoint
+# 用于在指定 epoch 后才保存模型
 class ConditionalCheckpoint(ModelCheckpoint):
     def __init__(self, start_epoch=80, **kwargs):
         super().__init__(**kwargs)
@@ -61,11 +67,12 @@ class ConditionalCheckpoint(ModelCheckpoint):
         if trainer.current_epoch >= self.start_epoch:
             super().on_train_epoch_end(trainer, pl_module)
 
-# 创建 ConditionalCheckpoint 回调
 
+# 5 折交叉验证，但是这里只用了一个 fold（也就是1折）
 for fold in range(1, 2):
     print('fold', fold)
 
+    # 加载数据集
     train_dataset = Mydataset_CAMUS_Multitask(split="train", fold=fold)
     test_dataset = Mydataset_CAMUS_Multitask(split="test", fold=fold)
 
@@ -92,12 +99,12 @@ for fold in range(1, 2):
         mode='max',  # 指定监控指标是最小化
         start_epoch=81# 从第 80 个 epoch 开始保存
     )
-
+    # 初始化 Trainer
     trainer = pl.Trainer(max_epochs=epochs, gpus=[gpu],
                          check_val_every_n_epoch=1, logger=wandb_logger,callbacks=[checkpoint_callback])
     model = MyModel_MultiTask(mlr=lr)
     trainer.fit(model, train_dataloader, test_dataloader)
-
+    # 下面定义了两个任务的评价指标，分别是 view 和 mi 任务的准确率、F1、特异度、精确度、敏感度和 AUC
     view_metrics = model.best_acc_metrics_view
     view_accs.append(view_metrics['val_acc_view'])
     view_f1s.append(view_metrics['val_f1_view'])
@@ -117,6 +124,7 @@ for fold in range(1, 2):
     # 结束当前的 WandB 会话
     wandb.finish()
 
+# 输出 5 折交叉验证的平均结果（但是他代码里只用了1折）
 print('Average view over the 5 folds:\n')
 print('Accuracy:', sum(view_accs) / 5)
 print('F1:', sum(view_f1s) / 5)

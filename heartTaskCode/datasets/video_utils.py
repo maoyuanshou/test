@@ -5,8 +5,10 @@ import cv2
 import pydicom as dicom
 import torch
 
+# 视频处理函数
 
 _ybr_to_rgb_lut = None
+# 放缩函数
 def apply_zoom(img_batch,zoom=0.1):
     """
     Apply zoom on a batch of images using PyTorch.
@@ -28,7 +30,7 @@ def apply_zoom(img_batch,zoom=0.1):
     img_zoomed = img_batch[:, pad_y:-pad_y, pad_x:-pad_x, :]
 
     return img_zoomed
-
+# 裁剪函数
 def crop_and_scale(img, res=(224, 224), interpolation=cv2.INTER_CUBIC, zoom=0.1):
     in_res = (img.shape[1], img.shape[0])
     r_in = in_res[0] / in_res[1]
@@ -47,7 +49,7 @@ def crop_and_scale(img, res=(224, 224), interpolation=cv2.INTER_CUBIC, zoom=0.1)
 
     img = cv2.resize(img, res, interpolation=interpolation)
     return img
-
+# 下采样函数
 def downsample_and_crop(testarray):
 
         ##################### CREATE MASK #####################
@@ -116,7 +118,7 @@ def downsample_and_crop(testarray):
             frame_overlap = frame_overlap[:,bias:width-bias]
             testarray = testarray[:, :, bias:width-bias, :]
         return testarray
-
+# 掩膜函数：掩盖超声区域外的所有像素
 def mask_outside_ultrasound(original_pixels: np.array) -> np.array:
     """
     Masks all pixels outside the ultrasound region in a video.
@@ -286,10 +288,10 @@ def mask_outside_ultrasound_avi(original_pixels: np.array) -> np.array:
         print("掩膜处理出错，返回原始帧。")
         return vid
 
-
+# 写视频
 def write_video(p: Path, pixels: np.ndarray, fps=30.0, codec='h264'):
     torchvision.io.write_video(str(p), pixels, fps, codec)
-
+# 写视频avi
 def write_to_avi(frames: np.ndarray, out_file, fps=30):
     out = cv2.VideoWriter(str(out_file), cv2.VideoWriter_fourcc(*'MJPG'), fps, (frames.shape[2], frames.shape[1]))
     for frame in frames:
@@ -299,16 +301,16 @@ def write_to_avi(frames: np.ndarray, out_file, fps=30):
 # def read_video(p: Path, start=None, end=None, units=None, out_format=None):
 #     return torchvision.io.read_video(str(p), start, end, units, out_format)
 
-
+# 写图像
 def write_image(p: Path, pixels: np.ndarray):
     cv2.imwrite(str(p), pixels)
 
-
+# 图像处理：从YBR转换为RGB
 def ybr_to_rgb(pixels: np.array):
     lut = get_ybr_to_rgb_lut()
     return lut[pixels[..., 0], pixels[..., 1], pixels[..., 2]]
 
-
+# 获取YBR到RGB的lut
 def get_ybr_to_rgb_lut(save_lut=True):
     global _ybr_to_rgb_lut
 
@@ -330,7 +332,7 @@ def get_ybr_to_rgb_lut(save_lut=True):
         np.save(lut_path, _ybr_to_rgb_lut)
     return _ybr_to_rgb_lut
 
-
+#读取视频
 def read_video(
     path,
     n_frames=None,
@@ -415,7 +417,7 @@ def read_video(
         out = np.squeeze(out)
     return out, vid_size, fps
 
-
+#处理avi视频，均匀取样16帧
 def process_avi_videos(filePath, startFrame, endFrame):
     # 定义参数
     video_size = 224

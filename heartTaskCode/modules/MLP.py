@@ -2,7 +2,9 @@ import torch.nn as nn
 import pytorch_lightning as pl
 import torch
 
+# 多任务和视图分类任务的 MLP 模型
 
+# 视图分类任务 的 分类器
 class ClsMLP(pl.LightningModule):
     def __init__(self, input_size, output_size, dropout_prob=0.5):
         super(ClsMLP, self).__init__()
@@ -22,7 +24,7 @@ class ClsMLP(pl.LightningModule):
         x = self.fc2(x)  # 输出层
         return x
 
-
+# 多任务模型 左侧视图部分分类器
 class MutiTask_ViewClsMLP(pl.LightningModule):
     def __init__(self, input_size, output_size, dropout_prob=0.5):
         super(MutiTask_ViewClsMLP, self).__init__()
@@ -40,7 +42,7 @@ class MutiTask_ViewClsMLP(pl.LightningModule):
         x = self.fc2(x)  # 输出层
         return x, x_for_mi
 
-
+# 多任务模型 右侧MI部分分类器
 class MutiTask_MIClsMLP(pl.LightningModule):
     def __init__(self, input_size, output_size, dropout_prob=0.5):
         super(MutiTask_MIClsMLP, self).__init__()
