@@ -3,6 +3,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from datasets import Mydataset_Sichuan_ViewCls
 from model import MyModel_View_CLS_Video
 import torch
+import os
 
 
 if __name__ == '__main__':
@@ -34,7 +35,7 @@ if __name__ == '__main__':
         mode="min"  # "min" 表示最小化该指标
     )
 
-    trainer = Trainer(max_epochs=1000, gpus=[0], callbacks=[checkpoint_callback], check_val_every_n_epoch=1)
+    trainer = Trainer(max_epochs=5, gpus=[0], callbacks=[checkpoint_callback], check_val_every_n_epoch=1)
     model = MyModel_View_CLS_Video(1e-5)
     trainer.fit(model, train_dataloader, test_dataloader)
     model.plot_metrics() # 训练结束后画图，存成metrics_xxxxx.png
@@ -68,7 +69,7 @@ if __name__ == '__main__':
         dummy_input,
         onnx_path,
         export_params=True,
-        opset_version=11,
+        opset_version=13,
         do_constant_folding=True,
         input_names=['input'],
         output_names=['output'],

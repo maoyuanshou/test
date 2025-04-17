@@ -1,9 +1,7 @@
 import torch
 from torch import nn
 
-# 辅助函数们，应该是原来的代码中用到的一些函数，现在应该都没用到
 
-# 确定下降的路径：以存活率survival_rate为根据，确定随机的下降深度
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
   This is the same as the DropConnect impl I created for EfficientNet, etc networks, however,
@@ -21,7 +19,7 @@ def drop_path(x, drop_prob: float = 0., training: bool = False):
     output = x.div(keep_prob) * random_tensor
     return output
 
-# 下降路径类，和上面函数功能一样，但是这里是一个类（方便forward）
+
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
   """
@@ -33,12 +31,12 @@ class DropPath(nn.Module):
     def forward(self, x):
         return drop_path(x, self.drop_prob, self.training)
 
-# 激活函数QuickGELU
+
 class QuickGELU(nn.Module):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
 
-# 分割用的prompt，这里估计是原始代码还包括了一些语义分割的任务和多模态，现在应该是用不到
+
 segment_prompts = {
     "A2C": ['ATHEROSCLEROTIC HEART DISEASE OF NATIVE CORONARY ARTERY WITHOUT ANGINA PECTORIS.'
         , 'THERE IS THE POSSIBILITY OF A LEFT VENTRICULAR APICAL MURAL THROMBUS.'

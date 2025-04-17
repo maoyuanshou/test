@@ -4,10 +4,7 @@ import torch
 import torchvision
 from . import video_utils
 
-# 加载CAMUS数据集
-
 class Mydataset_CAMUS_Multitask(torchvision.datasets.VisionDataset):
-    # 初始化
     def __init__(self, split, fold):
         '''
         HMC数据集 用echoclip的预处理
@@ -43,20 +40,20 @@ class Mydataset_CAMUS_Multitask(torchvision.datasets.VisionDataset):
                     self.heartFrames.append(
                         (int(row["Start_A2C"]), int(row["End_A2C"]), int(row["Start_A4C"]), int(row["End_A4C"])))
                     self.segs.append(seg)
-    #获取数据集长度（病人数）
+
     def __len__(self):
         return len(self.patients)
-    #获取数据
+
     def __getitem__(self, idx):
         # 加载视频并提取 num_frames 帧
         name = self.patients[idx]
         segs = self.segs[idx]
         heartFrames = self.heartFrames[idx]
 
-        a2c_path = f'D:/dataset/CAMUS/A2C/{name}.avi'
+        a2c_path = f'/root/autodl-tmp/heartTaskCode/CAMUS-被省医院医生标注了心肌梗死标签/A2C/{name}.avi'
         tensor1 = video_utils.process_avi_videos(a2c_path, heartFrames[0], heartFrames[1])
 
-        a4c_path = f'D:/dataset/CAMUS/A4C/{name}.avi'
+        a4c_path = f'/root/autodl-tmp/heartTaskCode/CAMUS-被省医院医生标注了心肌梗死标签/A4C/{name}.avi'
         tensor2 = video_utils.process_avi_videos(a4c_path, heartFrames[2], heartFrames[3])
         # 创建切面分类标签
         labels = [0, 1]  # A2C为0，A4C为1
